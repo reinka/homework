@@ -2,9 +2,9 @@ import tensorflow as tf
 
 
 class BaselineModel(tf.keras.Model):
-    def __init__(self, input_dim, output_dim, scalerX=None, scalerY=None):
+    def __init__(self, n_hidden, output_dim, scalerX=None, scalerY=None):
         super(BaselineModel, self).__init__()
-        self.dense1 = tf.keras.layers.Dense(input_dim, activation=tf.nn.relu)
+        self.dense1 = tf.keras.layers.Dense(n_hidden, activation=tf.nn.relu)
         self.outputs = tf.keras.layers.Dense(output_dim)
         self.scalerX = scalerX
         self.scalerY = scalerY
