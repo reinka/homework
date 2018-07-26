@@ -1,3 +1,5 @@
+import gym
+import numpy as np
 from sklearn.preprocessing import StandardScaler
 
 
@@ -30,3 +32,30 @@ def plot_loss(history):
     plt.ylabel('Loss')
     plt.legend()
     plt.show()
+
+
+def play_env(envname, model, policy_fn=policy_fn, num_rollouts=5,
+             render=False):
+    env = gym.make(envname)
+    max_steps = env.spec.timestep_limit
+    returns = []
+
+    for i_episode in range(num_rollouts):
+        done = False
+        obs = env.reset()
+        total_reward = 0
+        steps = 0
+        while not done:
+            if render:
+                env.render()
+
+            obs, reward, done, info = env.step(
+                policy_fn(model,
+                          obs[np.newaxis,]))  # take a random action
+            total_reward += reward
+            steps += 1
+            if steps >= max_steps:
+                break
+        returns.append(total_reward)
+
+    return returns
