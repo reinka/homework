@@ -16,6 +16,7 @@ import tf_util
 import gym
 import load_policy
 
+
 def main():
     import argparse
     parser = argparse.ArgumentParser()
@@ -25,6 +26,8 @@ def main():
     parser.add_argument("--max_timesteps", type=int)
     parser.add_argument('--num_rollouts', type=int, default=20,
                         help='Number of expert roll outs')
+    parser.add_argument('--expert_data_file', type=str,
+                        help='Save expert data as pickle file')
     args = parser.parse_args()
 
     print('loading and building expert policy')
@@ -34,21 +37,21 @@ def main():
     with tf.Session():
         tf_util.initialize()
 
-        import gym
         env = gym.make(args.envname)
         max_steps = args.max_timesteps or env.spec.timestep_limit
 
         returns = []
         observations = []
         actions = []
+        bar = tf.keras.utils.Progbar(args.num_rollouts)
         for i in range(args.num_rollouts):
-            print('iter', i)
+            bar.update(i)
             obs = env.reset()
             done = False
             totalr = 0.
             steps = 0
             while not done:
-                action = policy_fn(obs[None,:])
+                action = policy_fn(obs[None, :])
                 observations.append(obs)
                 actions.append(action)
                 obs, r, done, _ = env.step(action)
@@ -56,17 +59,21 @@ def main():
                 steps += 1
                 if args.render:
                     env.render()
-                if steps % 100 == 0: print("%i/%i"%(steps, max_steps))
+                # if steps % 100 == 0: print("%i/%i" % (steps, max_steps))
                 if steps >= max_steps:
                     break
             returns.append(totalr)
 
-        print('returns', returns)
         print('mean return', np.mean(returns))
         print('std of return', np.std(returns))
 
-        expert_data = {'observations': np.array(observations),
-                       'actions': np.array(actions)}
+        if args.expert_data_file:
+            print("Expert data saved at", args.expert_data_file)
+            expert_data = {'observations': np.array(observations),
+                           'actions': np.array(actions)}
+            pickle.dump(expert_data, open(args.expert_data_file, 'wb'),
+                        protocol=pickle.HIGHEST_PROTOCOL)
+
 
 if __name__ == '__main__':
     main()
