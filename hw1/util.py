@@ -1,4 +1,5 @@
 import gym
+import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 
@@ -24,8 +25,6 @@ def policy_fn(model, obs):
 
 
 def plot_loss(history):
-    import matplotlib.pyplot as plt
-
     plt.plot(history.history['loss'], label='train')
     plt.plot(history.history['val_loss'], label='test')
     plt.xlabel('Epochs')
