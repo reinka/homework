@@ -37,7 +37,8 @@ def play_env(envname, model, policy_fn=policy_fn, num_rollouts=5,
              render=False):
     env = gym.make(envname)
     max_steps = env.spec.timestep_limit
-    returns = []
+    rewards = []
+    observations = []
 
     for i_episode in range(num_rollouts):
         done = False
@@ -45,16 +46,17 @@ def play_env(envname, model, policy_fn=policy_fn, num_rollouts=5,
         total_reward = 0
         steps = 0
         while not done:
+            observations.append(obs)
             if render:
                 env.render()
+            action = policy_fn(model, obs[np.newaxis,])
 
-            obs, reward, done, info = env.step(
-                policy_fn(model,
-                          obs[np.newaxis,]))  # take a random action
+            obs, reward, done, info = env.step(action)
             total_reward += reward
             steps += 1
             if steps >= max_steps:
                 break
-        returns.append(total_reward)
+        rewards.append(total_reward)
 
-    return returns
+    return {'rewards': np.array(rewards),
+            'observations': np.array(observations)}
