@@ -211,7 +211,7 @@ class Agent(object):
         else:
             sy_mean, sy_logstd = policy_parameters
             # YOUR_CODE_HERE
-            sy_sampled_ac =  tf.random_normal(
+            sy_sampled_ac = tf.random_normal(
                 tf.shape(sy_mean), mean=sy_mean, stddev=tf.exp(sy_logstd))
 
         return sy_sampled_ac
@@ -240,15 +240,18 @@ class Agent(object):
                 For the discrete case, use the log probability under a categorical distribution.
                 For the continuous case, use the log probability under a multivariate gaussian.
         """
-        raise NotImplementedError
         if self.discrete:
             sy_logits_na = policy_parameters
             # YOUR_CODE_HERE
-            sy_logprob_n = None
+            sy_one_hot_ac_na = tf.one_hot(sy_ac_na, depth=self.ac_dim)
+            sy_logprob_n = tf.log(tf.reduce_sum(
+                sy_logits_na * sy_one_hot_ac_na, axis=1))
         else:
             sy_mean, sy_logstd = policy_parameters
             # YOUR_CODE_HERE
-            sy_logprob_n = None
+            sy_logprob_n = tf.contrib.distributions.MultivariateNormalDiag(
+                loc=sy_mean, scale_diag=tf.exp(sy_logstd)).log_prob(sy_ac_na)
+
         return sy_logprob_n
 
     def build_computation_graph(self):
@@ -292,7 +295,8 @@ class Agent(object):
         # ========================================================================================#
 
         # negative sign since most optimizers expect to minimize something
-        loss = - tf.reduce_mean(self.sy_logprob_n * self.sy_adv_n)  # YOUR CODE HERE
+        loss = - tf.reduce_mean(
+            self.sy_logprob_n * self.sy_adv_n)  # YOUR CODE HERE
         self.update_op = tf.train.AdamOptimizer(self.learning_rate).minimize(
             loss)
 
