@@ -213,7 +213,7 @@ class Agent(object):
             # YOUR_CODE_HERE
             sy_sampled_ac =  tf.random_normal(
                 tf.shape(sy_mean), mean=sy_mean, stddev=tf.exp(sy_logstd))
-        
+
         return sy_sampled_ac
 
     # ========================================================================================#
@@ -290,7 +290,9 @@ class Agent(object):
         #                           ----------PROBLEM 2----------
         # Loss Function and Training Operation
         # ========================================================================================#
-        loss = None  # YOUR CODE HERE
+
+        # negative sign since most optimizers expect to minimize something
+        loss = - tf.reduce_mean(self.sy_logprob_n * self.sy_adv_n)  # YOUR CODE HERE
         self.update_op = tf.train.AdamOptimizer(self.learning_rate).minimize(
             loss)
 
