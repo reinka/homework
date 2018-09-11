@@ -60,3 +60,14 @@ def play_env(envname, model, policy_fn=policy_fn, num_rollouts=5,
 
     return {'rewards': np.array(rewards),
             'observations': np.array(observations)}
+
+
+def plt_errorbars(x, y, yerr, figsize=(15, 5), xlabel='Number of hidden units',
+                  ylabel='Average reward'):
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.errorbar(x, y, yerr, label='Error bars',
+                fmt="rs--")
+    ax.legend()
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.show()
