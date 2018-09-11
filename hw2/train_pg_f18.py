@@ -41,8 +41,18 @@ def build_mlp(input_placeholder, output_size, scope, n_layers, size,
 
         Hint: use tf.layers.dense    
     """
-    # YOUR CODE HERE
-    raise NotImplementedError
+    with tf.variable_scope(scope):
+        # TODO use tf.contrib.layers.repeat
+        hidden = input_placeholder
+        for i in range(n_layers):
+            hidden = tf.layers.dense(inputs=hidden, units=size,
+                                     activation=activation,
+                                     name='hidden_%s' % i)
+
+        output_placeholder = tf.layers.dense(inputs=hidden, units=output_size,
+                                             activation=output_activation,
+                                             name='output')
+
     return output_placeholder
 
 
@@ -106,7 +116,6 @@ class Agent(object):
                 sy_ac_na: placeholder for actions
                 sy_adv_n: placeholder for advantages
         """
-        raise NotImplementedError
         sy_ob_no = tf.placeholder(shape=[None, self.ob_dim], name="ob",
                                   dtype=tf.float32)
         if self.discrete:
@@ -115,7 +124,7 @@ class Agent(object):
             sy_ac_na = tf.placeholder(shape=[None, self.ac_dim], name="ac",
                                       dtype=tf.float32)
             # YOUR CODE HERE
-        sy_adv_n = None
+        sy_adv_n = tf.placeholder(shape=[None], name='adv', dtype=tf.float32)
         return sy_ob_no, sy_ac_na, sy_adv_n
 
     # ========================================================================================#
@@ -146,15 +155,26 @@ class Agent(object):
                 Pass in self.n_layers for the 'n_layers' argument, and
                 pass in self.size for the 'size' argument.
         """
-        raise NotImplementedError
         if self.discrete:
             # YOUR_CODE_HERE
-            sy_logits_na = None
+            sy_logits_na = build_mlp(
+                input_placeholder=sy_ob_no,
+                output_size=self.ac_dim,
+                scope="nn_actor",
+                n_layers=self.n_layers,
+                size=self.size,
+                output_activation=self.nn.sigmoid)
             return sy_logits_na
         else:
             # YOUR_CODE_HERE
-            sy_mean = None
-            sy_logstd = None
+            sy_mean = build_mlp(
+                input_placeholder=sy_ob_no,
+                output_size=self.ac_dim,
+                scope="nn_actor_mean",
+                n_layers=self.n_layers,
+                size=self.size)
+            sy_logstd = tf.get_variable('sy_logstd', shape=[self.ac_dim],
+                                        dtype=tf.float32)
             return (sy_mean, sy_logstd)
 
     # ========================================================================================#
@@ -300,7 +320,7 @@ class Agent(object):
         paths = []
         while True:
             animate_this_episode = (
-                        len(paths) == 0 and (itr % 10 == 0) and self.animate)
+                    len(paths) == 0 and (itr % 10 == 0) and self.animate)
             path = self.sample_trajectory(env, animate_this_episode)
             paths.append(path)
             timesteps_this_batch += pathlength(path)
