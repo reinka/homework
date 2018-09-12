@@ -64,6 +64,15 @@ def sum_discounted_rewards(rewards, gamma):
     return sum((gamma ** i) * rewards[i] for i in range(len(rewards)))
 
 
+def discounted_rewards_to_go(rewards, gamma):
+    result = []
+    future_reward = 0
+    for r in reversed(rewards):
+        future_reward = future_reward * gamma + r
+        result.append(future_reward)
+    return result[::-1]
+
+
 def setup_logger(logdir, locals_):
     # Configure output directory for logging
     logz.configure_output_dir(logdir)
@@ -437,7 +446,8 @@ class Agent(object):
         """
         # YOUR_CODE_HERE
         if self.reward_to_go:
-            raise NotImplementedError
+            q_n = np.concatenate(
+                [discounted_rewards_to_go(path, self.gamma) for path in re_n])
         else:
             q_n = np.concatenate([
                 [sum_discounted_rewards(path, self.gamma)] * len(path)
