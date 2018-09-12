@@ -60,6 +60,10 @@ def pathlength(path):
     return len(path["reward"])
 
 
+def sum_discounted_rewards(rewards, gamma):
+    return sum((gamma ** i) * rewards[i] for i in range(len(rewards)))
+
+
 def setup_logger(logdir, locals_):
     # Configure output directory for logging
     logz.configure_output_dir(logdir)
@@ -207,7 +211,7 @@ class Agent(object):
         if self.discrete:
             sy_logits_na = policy_parameters
             # YOUR_CODE_HERE
-            sy_sampled_ac = tf.multinomial(sy_logits_na, 1)
+            sy_sampled_ac = tf.squeeze(tf.multinomial(sy_logits_na, 1), [1])
         else:
             sy_mean, sy_logstd = policy_parameters
             # YOUR_CODE_HERE
@@ -244,12 +248,13 @@ class Agent(object):
             sy_logits_na = policy_parameters
             # YOUR_CODE_HERE
             sy_one_hot_ac_na = tf.one_hot(sy_ac_na, depth=self.ac_dim)
-            sy_logprob_n = tf.log(tf.reduce_sum(
-                sy_logits_na * sy_one_hot_ac_na, axis=1))
+            sy_logprob_n = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                labels=sy_ac_na, logits=sy_logits_na, name='logprob'
+            )
         else:
             sy_mean, sy_logstd = policy_parameters
             # YOUR_CODE_HERE
-            sy_logprob_n = tf.contrib.distributions.MultivariateNormalDiag(
+            sy_logprob_n = - tf.contrib.distributions.MultivariateNormalDiag(
                 loc=sy_mean, scale_diag=tf.exp(sy_logstd)).log_prob(sy_ac_na)
 
         return sy_logprob_n
@@ -294,9 +299,8 @@ class Agent(object):
         # Loss Function and Training Operation
         # ========================================================================================#
 
-        # negative sign since most optimizers expect to minimize something
-        self.loss = - tf.reduce_mean(
-            self.sy_logprob_n * self.sy_adv_n)  # YOUR CODE HERE
+        self.loss = tf.reduce_mean(
+            tf.multiply(self.sy_logprob_n, self.sy_adv_n))  # YOUR CODE HERE
         self.update_op = tf.train.AdamOptimizer(self.learning_rate).minimize(
             self.loss)
 
@@ -327,7 +331,7 @@ class Agent(object):
         paths = []
         while True:
             animate_this_episode = (
-                    len(paths) == 0 and (itr % 10 == 0) and self.animate)
+                    len(paths) == 0 and (itr % 25 == 0) and self.animate)
             path = self.sample_trajectory(env, animate_this_episode)
             paths.append(path)
             timesteps_this_batch += pathlength(path)
@@ -348,8 +352,9 @@ class Agent(object):
             #                           ----------PROBLEM 3----------
             # ====================================================================================#
             ac = self.sess.run(self.sy_sampled_ac,
-                               feed_dict={self.sy_ob_no: ob[None]})  # YOUR CODE HERE
-            ac = ac[0][0]
+                               feed_dict={
+                                   self.sy_ob_no: ob[None]})  # YOUR CODE HERE
+            ac = ac[0]
             acs.append(ac)
             ob, rew, done, _ = env.step(ac)
             rewards.append(rew)
@@ -434,9 +439,9 @@ class Agent(object):
         if self.reward_to_go:
             raise NotImplementedError
         else:
-            q_n = np.array(
-                [self.gamma ** i * r for path in re_n for i, r in
-                 enumerate(path)])
+            q_n = np.concatenate([
+                [sum_discounted_rewards(path, self.gamma)] * len(path)
+                for path in re_n])
         return q_n
 
     def compute_advantage(self, ob_no, q_n):
@@ -555,7 +560,8 @@ class Agent(object):
         # and after an update, and then log them below. 
 
         # YOUR_CODE_HERE
-        feed_dict = {self.sy_ob_no: ob_no, self.sy_ac_na: ac_na, self.sy_adv_n: adv_n}
+        feed_dict = {self.sy_ob_no: ob_no, self.sy_ac_na: ac_na,
+                     self.sy_adv_n: adv_n}
         loss_before_update = self.sess.run(self.loss, feed_dict=feed_dict)
         self.sess.run(self.update_op, feed_dict=feed_dict)
         loss_after_update = self.sess.run(self.loss, feed_dict=feed_dict)
@@ -659,7 +665,8 @@ def train_PG(
         re_n = [path["reward"] for path in paths]
 
         q_n, adv_n = agent.estimate_return(ob_no, re_n)
-        loss_before, loss_after = agent.update_parameters(ob_no, ac_na, q_n, adv_n)
+        loss_before, loss_after = agent.update_parameters(ob_no, ac_na, q_n,
+                                                          adv_n)
 
         # Log diagnostics
         returns = [path["reward"].sum() for path in paths]
