@@ -163,7 +163,7 @@ class Agent(object):
                 scope="nn_actor",
                 n_layers=self.n_layers,
                 size=self.size,
-                output_activation=self.nn.sigmoid)
+                output_activation=tf.nn.sigmoid)
             return sy_logits_na
         else:
             # YOUR_CODE_HERE
@@ -348,8 +348,8 @@ class Agent(object):
             #                           ----------PROBLEM 3----------
             # ====================================================================================#
             ac = self.sess.run(self.sy_sampled_ac,
-                               feed_dict={self.sy_ob_no: ob})  # YOUR CODE HERE
-            ac = ac[0]
+                               feed_dict={self.sy_ob_no: ob[None]})  # YOUR CODE HERE
+            ac = ac[0][0]
             acs.append(ac)
             ob, rew, done, _ = env.step(ac)
             rewards.append(rew)
@@ -555,7 +555,7 @@ class Agent(object):
         # and after an update, and then log them below. 
 
         # YOUR_CODE_HERE
-        feed_dict = {sy_ac_na: ac_na, sy_adv_n: adv_n}
+        feed_dict = {self.sy_ob_no: ob_no, self.sy_ac_na: ac_na, self.sy_adv_n: adv_n}
         loss_before_update = self.sess.run(self.loss, feed_dict=feed_dict)
         self.sess.run(self.update_op, feed_dict=feed_dict)
         loss_after_update = self.sess.run(self.loss, feed_dict=feed_dict)
