@@ -347,8 +347,8 @@ class Agent(object):
             # ====================================================================================#
             #                           ----------PROBLEM 3----------
             # ====================================================================================#
-            raise NotImplementedError
-            ac = None  # YOUR CODE HERE
+            ac = self.sess.run(self.sy_sampled_ac,
+                               feed_dict={self.sy_ob_no: ob})  # YOUR CODE HERE
             ac = ac[0]
             acs.append(ac)
             ob, rew, done, _ = env.step(ac)
@@ -434,7 +434,9 @@ class Agent(object):
         if self.reward_to_go:
             raise NotImplementedError
         else:
-            raise NotImplementedError
+            q_n = np.array(
+                [self.gamma ** i * r for path in re_n for i, r in
+                 enumerate(path)])
         return q_n
 
     def compute_advantage(self, ob_no, q_n):
@@ -541,7 +543,7 @@ class Agent(object):
             raise NotImplementedError
             target_n = None
 
-            # ====================================================================================#
+        # ====================================================================================#
         #                           ----------PROBLEM 3----------
         # Performing the Policy Update
         # ====================================================================================#
