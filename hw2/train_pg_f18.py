@@ -295,10 +295,10 @@ class Agent(object):
         # ========================================================================================#
 
         # negative sign since most optimizers expect to minimize something
-        loss = - tf.reduce_mean(
+        self.loss = - tf.reduce_mean(
             self.sy_logprob_n * self.sy_adv_n)  # YOUR CODE HERE
         self.update_op = tf.train.AdamOptimizer(self.learning_rate).minimize(
-            loss)
+            self.loss)
 
         # ========================================================================================#
         #                           ----------PROBLEM 6----------
@@ -555,7 +555,12 @@ class Agent(object):
         # and after an update, and then log them below. 
 
         # YOUR_CODE_HERE
-        raise NotImplementedError
+        feed_dict = {sy_ac_na: ac_na, sy_adv_n: adv_n}
+        loss_before_update = self.sess.run(self.loss, feed_dict=feed_dict)
+        self.sess.run(self.update_op, feed_dict=feed_dict)
+        loss_after_update = self.sess.run(self.loss, feed_dict=feed_dict)
+
+        return loss_before_update, loss_after_update
 
 
 def train_PG(
@@ -654,7 +659,7 @@ def train_PG(
         re_n = [path["reward"] for path in paths]
 
         q_n, adv_n = agent.estimate_return(ob_no, re_n)
-        agent.update_parameters(ob_no, ac_na, q_n, adv_n)
+        loss_before, loss_after = agent.update_parameters(ob_no, ac_na, q_n, adv_n)
 
         # Log diagnostics
         returns = [path["reward"].sum() for path in paths]
@@ -669,6 +674,8 @@ def train_PG(
         logz.log_tabular("EpLenStd", np.std(ep_lengths))
         logz.log_tabular("TimestepsThisBatch", timesteps_this_batch)
         logz.log_tabular("TimestepsSoFar", total_timesteps)
+        logz.log_tabular("LossBefore", loss_before)
+        logz.log_tabular("LossAfter", loss_after)
         logz.dump_tabular()
         logz.pickle_tf_vars()
 
