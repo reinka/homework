@@ -176,7 +176,7 @@ class Agent(object):
                 scope="nn_actor",
                 n_layers=self.n_layers,
                 size=self.size,
-                output_activation=tf.nn.sigmoid)
+            )
             return sy_logits_na
         else:
             # YOUR_CODE_HERE
@@ -330,10 +330,10 @@ class Agent(object):
             # YOUR_CODE_HERE
             self.sy_target_n = tf.placeholder(shape=[None], name='targets',
                                               dtype=tf.float32)
-            baseline_loss = tf.nn.l2_loss(self.baseline_prediction -
-                                          self.sy_target_n)
+            self.baseline_loss = tf.nn.l2_loss(self.baseline_prediction -
+                                               self.sy_target_n)
             self.baseline_update_op = tf.train.AdamOptimizer(
-                self.learning_rate).minimize(baseline_loss)
+                self.learning_rate).minimize(self.baseline_loss)
 
     def sample_trajectories(self, itr, env):
         # Collect paths until we have enough timesteps
@@ -547,6 +547,7 @@ class Agent(object):
         #                           ----------PROBLEM 6----------
         # Optimizing Neural Network Baseline
         # ====================================================================================#
+        critic_loss_before, critic_loss_after = None, None
         if self.nn_baseline:
             # If a neural network baseline is used, set up the targets and the inputs for the
             # baseline.
@@ -561,9 +562,10 @@ class Agent(object):
             # YOUR_CODE_HERE
             # self.baseline_update_op
             target_n = (q_n - np.mean(q_n, axis=0)) / np.std(q_n, axis=0)
-            self.sess.run(self.baseline_update_op, feed_dict={
-                self.sy_ob_no: ob_no,
-                self.sy_target_n: target_n})
+            feed_dict = {self.sy_ob_no: ob_no, self.sy_target_n: target_n}
+            critic_loss_before = self.sess.run(self.baseline_loss, feed_dict)
+            self.sess.run(self.baseline_update_op, feed_dict=feed_dict)
+            critic_loss_after = self.sess.run(self.baseline_loss, feed_dict)
 
         # ====================================================================================#
         #                           ----------PROBLEM 3----------
@@ -579,11 +581,11 @@ class Agent(object):
         # YOUR_CODE_HERE
         feed_dict = {self.sy_ob_no: ob_no, self.sy_ac_na: ac_na,
                      self.sy_adv_n: adv_n}
-        loss_before_update = self.sess.run(self.loss, feed_dict=feed_dict)
+        actor_loss_before = self.sess.run(self.loss, feed_dict=feed_dict)
         self.sess.run(self.update_op, feed_dict=feed_dict)
-        loss_after_update = self.sess.run(self.loss, feed_dict=feed_dict)
+        actor_loss_after = self.sess.run(self.loss, feed_dict=feed_dict)
 
-        return loss_before_update, loss_after_update
+        return actor_loss_before, actor_loss_after, critic_loss_before, critic_loss_after
 
 
 def train_PG(
@@ -682,8 +684,10 @@ def train_PG(
         re_n = [path["reward"] for path in paths]
 
         q_n, adv_n = agent.estimate_return(ob_no, re_n)
-        loss_before, loss_after = agent.update_parameters(ob_no, ac_na, q_n,
-                                                          adv_n)
+        actor_loss_before, actor_loss_after, critic_loss_before, \
+        critic_loss_after = agent.update_parameters(ob_no,
+                                                    ac_na, q_n,
+                                                    adv_n)
 
         # Log diagnostics
         returns = [path["reward"].sum() for path in paths]
@@ -698,8 +702,10 @@ def train_PG(
         logz.log_tabular("EpLenStd", np.std(ep_lengths))
         logz.log_tabular("TimestepsThisBatch", timesteps_this_batch)
         logz.log_tabular("TimestepsSoFar", total_timesteps)
-        logz.log_tabular("LossBefore", loss_before)
-        logz.log_tabular("LossAfter", loss_after)
+        logz.log_tabular("ActorLossBefore", actor_loss_before)
+        logz.log_tabular("ActorLossAfter", actor_loss_after)
+        logz.log_tabular("CriticLossBefore", critic_loss_before)
+        logz.log_tabular("CriticLossAfter", critic_loss_after)
         logz.dump_tabular()
         logz.pickle_tf_vars()
 
