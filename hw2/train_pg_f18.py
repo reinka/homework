@@ -522,8 +522,9 @@ class Agent(object):
         if self.normalize_advantages:
             # On the next line, implement a trick which is known empirically to reduce variance
             # in policy gradient methods: normalize adv_n to have mean zero and std=1.
-            adv_n = (adv_n - np.mean(adv_n, axis=0)) / np.std(adv_n,
-                                                              axis=0)  # YOUR_CODE_HERE
+            adv_n = (adv_n - np.mean(adv_n, axis=0)) / (np.std(adv_n,axis=0)
+                                                        + 1e-7 )
+            # YOUR_CODE_HERE
         return q_n, adv_n
 
     def update_parameters(self, ob_no, ac_na, q_n, adv_n):
@@ -561,7 +562,8 @@ class Agent(object):
 
             # YOUR_CODE_HERE
             # self.baseline_update_op
-            target_n = (q_n - np.mean(q_n, axis=0)) / np.std(q_n, axis=0)
+            target_n = (q_n - np.mean(q_n, axis=0)) / (np.std(q_n, axis=0) +
+                                                       1e-7)
             feed_dict = {self.sy_ob_no: ob_no, self.sy_target_n: target_n}
             critic_loss_before = self.sess.run(self.baseline_loss, feed_dict)
             self.sess.run(self.baseline_update_op, feed_dict=feed_dict)
