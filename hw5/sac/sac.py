@@ -1,6 +1,10 @@
 import tensorflow as tf
 import time
 
+# local modules
+import utils
+
+
 class SAC:
     """Soft Actor-Critic (SAC)
     Original code from Tuomas Haarnoja, Soroush Nasiriany, and Aurick Zhou for CS294-112 Fall 2018
@@ -18,8 +22,9 @@ class SAC:
                  discount=0.99,
                  epoch_length=1000,
                  learning_rate=3e-3,
-                 reparameterize=False,
+                 reparameterize=True,
                  tau=0.01,
+                 two_qf=True,
                  **kwargs):
         """
         Args:
@@ -32,6 +37,7 @@ class SAC:
         self._learning_rate = learning_rate
         self._reparameterize = reparameterize
         self._tau = tau
+        self._two_qf = two_qf
 
         self._training_ops = []
 
@@ -40,14 +46,17 @@ class SAC:
 
         self._create_placeholders(env)
 
-        policy_loss = self._policy_loss_for(policy, q_function, q_function2, value_function)
+        policy_loss = self._policy_loss_for(policy, q_function, q_function2,
+                                            value_function)
         value_function_loss = self._value_function_loss_for(
             policy, q_function, q_function2, value_function)
         q_function_loss = self._q_function_loss_for(q_function,
-                                                    target_value_function)
+                                                    target_value_function,
+                                                    scope='q_func_loss')
         if q_function2 is not None:
             q_function2_loss = self._q_function_loss_for(q_function2,
-                                                        target_value_function)
+                                                         target_value_function,
+                                                         scope='q_func2_loss')
 
         optimizer = tf.train.AdamOptimizer(
             self._learning_rate, name='optimizer')
@@ -60,7 +69,8 @@ class SAC:
             loss=q_function_loss, var_list=q_function.trainable_variables)
         if q_function2 is not None:
             q_function2_training_op = optimizer.minimize(
-                loss=q_function2_loss, var_list=q_function2.trainable_variables)
+                loss=q_function2_loss,
+                var_list=q_function2.trainable_variables)
 
         self._training_ops = [
             policy_training_op, value_training_op, q_function_training_op
@@ -93,34 +103,59 @@ class SAC:
         )
         self._rewards_ph = tf.placeholder(
             tf.float32,
-            shape=(None, ),
+            shape=(None,),
             name='rewards',
         )
         self._terminals_ph = tf.placeholder(
             tf.float32,
-            shape=(None, ),
+            shape=(None,),
             name='terminals',
         )
 
-    def _policy_loss_for(self, policy, q_function, q_function2, value_function):
+    def _compute_min_q_values(self, q_function, q_function2, actions):
+        q_values = q_function((self._observations_ph, actions))
+        if self._two_qf:
+            q_values_2 = q_function2((self._observations_ph, actions))
+            return tf.minimum(q_values, q_values_2)
+        return q_values
+
+    def _policy_loss_for(self, policy, q_function, q_function2,
+                         value_function):
+        actions, log_pis = policy(self._observations_ph)
+        min_q_values = self._compute_min_q_values(q_function, q_function2,
+                                                  actions)
+        vf_values = value_function(self._observations_ph)
+        inner_expectation = self._alpha * log_pis - min_q_values
+
         if not self._reparameterize:
             ### Problem 1.3.A
-            ### YOUR CODE HERE
-            raise NotImplementedError
+            adv_n, _ = utils.generalized_advantage(self._rewards_ph, vf_values,
+                                                   self._discount)
+            policy_loss = tf.reduce_mean(log_pis * (tf.stop_gradient(
+                inner_expectation) + adv_n))
         else:
             ### Problem 1.3.B
-            ### YOUR CODE HERE
-            raise NotImplementedError
+            policy_loss = tf.reduce_mean(inner_expectation)
 
-    def _value_function_loss_for(self, policy, q_function, q_function2, value_function):
+        return policy_loss
+
+    def _value_function_loss_for(self, policy, q_function, q_function2,
+                                 value_function):
         ### Problem 1.2.A
-        ### YOUR CODE HERE
-        raise NotImplementedError
+        actions, log_pis = policy(self._observations_ph)
+        vf_values = value_function(self._observations_ph)
+        min_q_values = self._compute_min_q_values(q_function, q_function2,
+                                                  actions)
+        v_backup = tf.stop_gradient(min_q_values - self._alpha * log_pis)
+        return 0.5 * tf.reduce_mean((v_backup - vf_values) ** 2)
 
-    def _q_function_loss_for(self, q_function, target_value_function):
+    def _q_function_loss_for(self, q_function, target_value_function, scope):
         ### Problem 1.1.A
-        ### YOUR CODE HERE
-        raise NotImplementedError
+        q_values = q_function((self._observations_ph, self._actions_ph))
+        vf_next_targets = target_value_function(self._next_observations_ph)
+        q_backup = tf.stop_gradient(self._rewards_ph + self._discount *
+                                    vf_next_targets * (1 - self._terminals_ph))
+        return 0.5 * tf.reduce_mean((q_backup - q_values) ** 2)
 
     def _create_target_update(self, source, target):
         """Create tensorflow operations for updating target value function."""

@@ -3,6 +3,30 @@ import os
 import tensorflow as tf
 
 
+def generalized_advantage(rewards, values, gamma, tau=0.95):
+    traj_len = len(rewards)
+    returns = np.empty((traj_len,))
+    deltas = np.empty((traj_len,))
+    advantages = np.empty((traj_len,))
+
+    prev_return = 0
+    prev_value = 0
+    prev_advantage = 0
+    for i in reversed(range(traj_len)):
+        returns[i] = rewards[i] + gamma * prev_return
+        deltas[i] = rewards[i] + gamma * prev_value - values[i]
+        advantages[i] = deltas[i] + gamma * tau * prev_advantage
+
+        prev_return = returns[i]
+        prev_value = values[i]
+        prev_advantage = advantages[i]
+
+    advantages = (advantages - np.mean(advantages, axis=0)) / (
+            np.std(advantages, axis=0) + 1e-7)
+
+    return advantages, returns
+
+
 class Logger:
     def __init__(self, log_dir):
         self._summary_writer = tf.summary.FileWriter(
