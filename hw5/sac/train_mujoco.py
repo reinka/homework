@@ -12,44 +12,45 @@ import utils
 
 from multiprocessing import Process
 
-def train_SAC(env_name, exp_name, seed, logdir):
+def train_SAC(env_name, exp_name, n_iter, ep_len, seed, logdir, alpha,
+              prefill_steps, discount, batch_size, learning_rate, tau, two_qf):
     alpha = {
         'Ant-v2': 0.1,
         'HalfCheetah-v2': 0.2,
         'Hopper-v2': 0.2,
         'Humanoid-v2': 0.05,
         'Walker2d-v2': 0.2,
-    }.get(env_name, 0.2)
+    }.get(env_name, alpha)
 
     algorithm_params = {
         'alpha': alpha,
-        'batch_size': 256,
-        'discount': 0.99,
-        'learning_rate': 1e-3,
-        'reparameterize': False,
-        'tau': 0.01,
-        'epoch_length': 1000,
-        'n_epochs': 500,
-        'two_qf': False,
+        'batch_size': batch_size,
+        'discount': discount,
+        'learning_rate': learning_rate,
+        'reparameterize': True,
+        'tau': tau,
+        'epoch_length': ep_len,
+        'n_epochs': n_iter,
+        'two_qf': two_qf,
     }
     sampler_params = {
         'max_episode_length': 1000,
-        'prefill_steps': 1000,
+        'prefill_steps': prefill_steps,
     }
     replay_pool_params = {
         'max_size': 1e6,
     }
 
     value_function_params = {
-        'hidden_layer_sizes': (128, 128),
+        'hidden_layer_sizes': (64, 64),
     }
 
     q_function_params = {
-        'hidden_layer_sizes': (128, 128),
+        'hidden_layer_sizes': (64, 64),
     }
 
     policy_params = {
-        'hidden_layer_sizes': (128, 128),
+        'hidden_layer_sizes': (64, 64),
     }
 
     logz.configure_output_dir(logdir)
@@ -121,7 +122,16 @@ def main():
     parser.add_argument('--env_name', type=str, default='HalfCheetah-v2')
     parser.add_argument('--exp_name', type=str, default=None)
     parser.add_argument('--seed', type=int, default=1)
+    parser.add_argument('--n_iter', '-n', type=int, default=500)
+    parser.add_argument('--ep_len', '-ep', type=int, default=1000)
+    parser.add_argument('--alpha', '-a', type=float, default=0.2)
+    parser.add_argument('--learning_rate', '-lr', type=float, default=1e-3)
+    parser.add_argument('--discount', '-d', type=float, default=0.99)
+    parser.add_argument('--tau', '-t', type=float, default=0.005)
+    parser.add_argument('--batch_size', '-bs', type=int, default=256)
+    parser.add_argument('--prefill_steps', '-ps', type=int, default=1000)
     parser.add_argument('--n_experiments', '-e', type=int, default=1)
+    parser.add_argument('--one_qf', action='store_true')
     args = parser.parse_args()
 
     data_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data')
@@ -141,8 +151,17 @@ def main():
             train_SAC(
                 env_name=args.env_name,
                 exp_name=args.exp_name,
+                n_iter=args.n_iter,
+                ep_len=args.ep_len,
                 seed=seed,
                 logdir=os.path.join(logdir, '%d' % seed),
+                alpha=args.alpha,
+                discount=args.discount,
+                prefill_steps=args.prefill_steps,
+                batch_size=args.batch_size,
+                learning_rate=args.learning_rate,
+                tau=args.tau,
+                two_qf=not args.one_qf,
             )
         # # Awkward hacky process runs, because Tensorflow does not like
         # # repeatedly calling train_AC in the same thread.
